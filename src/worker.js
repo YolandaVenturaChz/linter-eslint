@@ -86,7 +86,7 @@ module.exports = async () => {
     const {
       contents, type, config, filePath, projectPath, rules, emitKey
     } = jobConfig
-    if (config.disableFSCache) {
+    if (config.advanced.disableFSCache) {
       FindCache.clear()
     }
 
