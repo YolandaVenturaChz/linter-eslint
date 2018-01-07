@@ -8,6 +8,7 @@ import cryptoRandomString from 'crypto-random-string'
 // eslint-disable-next-line import/no-extraneous-dependencies, import/extensions
 import { Range } from 'atom'
 
+const lintRules = new Map()
 const fixableRules = new Set()
 
 /**
@@ -222,6 +223,25 @@ const generateInvalidTrace = async ({
 }
 
 /**
+ * Get the URL of the documentation for a rule, either from the rule's own
+ * metadata, from eslint-rule-documentation's known rules, or the fallback URL
+ * on how to add it to eslint-rule-documentation.
+ * @param  {String} ruleId The rule ID to get the documentation URL for
+ * @return {String}        URL of the rule documentation
+ */
+export function getRuleUrl(ruleId) {
+  const props = lintRules.get(ruleId)
+  if (props && props.meta && props.meta.docs && props.meta.docs.url) {
+    // The rule has a documentation URL specified in its metadata
+    return props.meta.docs.url
+  }
+
+  // The rule didn't specify a URL in its metadata, or was not currently known
+  // somehow. Attempt to determine a URL using eslint-rule-documentation.
+  return ruleURI(ruleId).url
+}
+
+/**
  * Given a raw response from ESLint, this processes the messages into a format
  * compatible with the Linter API.
  * @param  {Object}     messages   The messages from ESLint's response
@@ -279,7 +299,7 @@ export async function processESLintMessages(messages, textEditor, showRule, work
     }
 
     if (ruleId) {
-      ret.url = ruleURI(ruleId).url
+      ret.url = getRuleUrl(ruleId)
     }
 
     let range
@@ -320,6 +340,39 @@ export async function processESLintMessages(messages, textEditor, showRule, work
 }
 
 /**
+ * Update the list of fixable rules
+ */
+function updateFixableRules() {
+  fixableRules.clear()
+  lintRules.forEach((props, rule) => {
+    if (
+      Object.prototype.hasOwnProperty.call(props, 'meta') &&
+      Object.prototype.hasOwnProperty.call(props.meta, 'fixable')
+    ) {
+      fixableRules.add(rule)
+    }
+  })
+}
+
+/**
+ * Process the updated rules into the local Map and call further update functions
+ * @param  {Array} updatedRules Array of Arrays of the rule and properties
+ */
+export function updateRules(updatedRules) {
+  lintRules.clear()
+  updatedRules.forEach(([rule, props]) => lintRules.set(rule, props))
+  updateFixableRules()
+}
+
+/**
+ * Return the known list of rules.
+ * @return {Map} The currently known rules
+ */
+export function getRules() {
+  return lintRules
+}
+
+/**
  * Processes the response from the lint job
  * @param  {Object}     response   The raw response from the job
  * @param  {TextEditor} textEditor The Atom::TextEditor of the file the messages belong to
@@ -328,9 +381,8 @@ export async function processESLintMessages(messages, textEditor, showRule, work
  * @return {Promise}               The messages transformed into Linter messages
  */
 export async function processJobResponse(response, textEditor, showRule, worker) {
-  if (Object.prototype.hasOwnProperty.call(response, 'fixableRules')) {
-    fixableRules.clear()
-    response.fixableRules.forEach(rule => fixableRules.add(rule))
+  if (Object.prototype.hasOwnProperty.call(response, 'updatedRules')) {
+    updateRules(response.updatedRules)
   }
   return processESLintMessages(response.messages, textEditor, showRule, worker)
 }
