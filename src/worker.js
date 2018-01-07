@@ -5,7 +5,6 @@
 import Path from 'path'
 import { FindCache, findCached } from 'atom-linter'
 import * as Helpers from './worker-helpers'
-import isConfigAtHomeRoot from './is-config-at-home-root'
 
 process.title = 'linter-eslint helper'
 
@@ -92,9 +91,9 @@ module.exports = async () => {
 
     const fileDir = Path.dirname(filePath)
     const eslint = Helpers.getESLintInstance(fileDir, config, projectPath)
-    const configPath = Helpers.getConfigPath(fileDir)
-    const noProjectConfig = (configPath === null || isConfigAtHomeRoot(configPath))
-    if (noProjectConfig && config.disableWhenNoEslintConfig) {
+
+    const fileConfig = Helpers.getConfigForFile(eslint, filePath)
+    if (fileConfig === null && config.disableWhenNoEslintConfig) {
       emit(emitKey, { messages: [] })
       return
     }
@@ -102,7 +101,7 @@ module.exports = async () => {
     const relativeFilePath = Helpers.getRelativePath(fileDir, filePath, config, projectPath)
 
     const cliEngineOptions = Helpers
-      .getCLIEngineOptions(type, config, rules, relativeFilePath, fileDir, configPath)
+      .getCLIEngineOptions(type, config, rules, relativeFilePath, fileConfig)
 
     let response
     if (type === 'lint') {

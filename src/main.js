@@ -6,10 +6,7 @@ import { CompositeDisposable, Task } from 'atom'
 // Dependencies
 // NOTE: We are not directly requiring these in order to reduce the time it
 // takes to require this file as that causes delays in Atom loading this package
-let path
 let helpers
-let workerHelpers
-let isConfigAtHomeRoot
 
 // Configuration
 const scopes = []
@@ -17,7 +14,6 @@ let showRule
 let lintHtmlFiles
 let ignoredRulesWhenModified
 let ignoredRulesWhenFixing
-let disableWhenNoEslintConfig
 let ignoreFixableRulesWhileTyping
 
 // Internal variables
@@ -134,11 +130,6 @@ module.exports = {
     this.subscriptions.add(atom.config.observe(
       'linter-eslint.showRuleIdInMessage',
       (value) => { showRule = value }
-    ))
-
-    this.subscriptions.add(atom.config.observe(
-      'linter-eslint.disableWhenNoEslintConfig',
-      (value) => { disableWhenNoEslintConfig = value }
     ))
 
     this.subscriptions.add(atom.config.observe(
@@ -283,31 +274,13 @@ module.exports = {
       atom.notifications.addError(message)
     }
 
-    if (!path) {
-      path = require('path')
-    }
-    if (!isConfigAtHomeRoot) {
-      isConfigAtHomeRoot = require('./is-config-at-home-root')
-    }
-    if (!workerHelpers) {
-      workerHelpers = require('./worker-helpers')
-    }
-
     const filePath = textEditor.getPath()
-    const fileDir = path.dirname(filePath)
     const projectPath = atom.project.relativizePath(filePath)[0]
 
     // Get the text from the editor, so we can use executeOnText
     const text = textEditor.getText()
     // Do not try to make fixes on an empty file
     if (text.length === 0) {
-      return
-    }
-
-    // Do not try to fix if linting should be disabled
-    const configPath = workerHelpers.getConfigPath(fileDir)
-    const noProjectConfig = (configPath === null || isConfigAtHomeRoot(configPath))
-    if (noProjectConfig && disableWhenNoEslintConfig) {
       return
     }
 
@@ -332,7 +305,7 @@ module.exports = {
         filePath,
         projectPath
       })
-      if (!isSave) {
+      if (!isSave && response) {
         atom.notifications.addSuccess(response)
       }
     } catch (err) {
